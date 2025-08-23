@@ -147,16 +147,10 @@ const server = http.createServer((req, res) => {
     room.clients.add(res);
     // On close, remove client and clean up empty rooms
     req.on('close', () => {
+      // Remove this client from the room's client set when the SSE connection
+      // closes. We intentionally do **not** delete empty rooms here so that
+      // rooms persist until explicitly deleted via the /deleteRoom endpoint.
       room.clients.delete(res);
-      // If there are no clients left and no messages/locations, delete the room
-      if (
-        room.clients.size === 0 &&
-        room.messages.length === 0 &&
-        Object.keys(room.locations).length === 0 &&
-        roomName !== 'default'
-      ) {
-        delete rooms[roomName];
-      }
     });
     return;
   }
