@@ -6,7 +6,10 @@
 // global error handler. Incrementing this value ensures clients
 // download the latest script instead of using a cached one. Each
 // release should increment this value to invalidate old assets.
-const CACHE_NAME = 'location-chat-cache-v3';
+// Bump the cache again because we updated main.js to center the map on
+// the user's location. Changing the cache name forces the service worker
+// to reinstall and fetch the latest assets.
+const CACHE_NAME = 'location-chat-cache-v4';
 // List of resources to pre‑cache for offline use
 const STATIC_ASSETS = [
   '/',
