@@ -18,7 +18,10 @@
 // Bump cache again because we removed SRI attributes from Leaflet resources to
 // prevent CDN integrity mismatches. Changing the cache name forces
 // clients to download the updated index.html.
-const CACHE_NAME = 'location-chat-cache-v7';
+// Bump cache version because we've added room functionality, login overlay,
+// and other features. Updating the cache name forces clients to fetch the
+// latest assets, ensuring the new UI and logic are loaded.
+const CACHE_NAME = 'location-chat-cache-v8';
 // List of resources to pre‑cache for offline use
 const STATIC_ASSETS = [
   '/',

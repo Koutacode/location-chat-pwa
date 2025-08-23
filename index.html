@@ -37,6 +37,17 @@
       </div>
     </section>
   </main>
+  <!-- Login overlay for entering display name, room name and password -->
+  <div id="login-overlay">
+    <h2>ルームに入室</h2>
+    <input id="login-name" type="text" placeholder="ニックネーム" autocomplete="off" />
+    <input id="login-room" type="text" placeholder="ルーム名" autocomplete="off" />
+    <input id="login-pass" type="password" placeholder="パスワード (空白可)" autocomplete="off" />
+    <button id="login-btn">入室</button>
+    <button id="delete-room-btn">ルーム削除</button>
+  </div>
+  <!-- Logout button appears when logged in -->
+  <button id="logout-btn" style="display: none;">ログアウト</button>
   <script
     src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
     crossorigin=""
