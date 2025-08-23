@@ -39,6 +39,9 @@
   const loginBtn = document.getElementById('login-btn');
   const deleteRoomBtn = document.getElementById('delete-room-btn');
   const logoutBtn = document.getElementById('logout-btn');
+  // Dropdown of existing rooms and room display
+  const roomsSelect = document.getElementById('rooms-select');
+  const roomDisplay = document.getElementById('room-display');
 
       // Initialize map using Leaflet if available. Some deployment
       // environments may block external scripts (like Leaflet from unpkg),
@@ -99,6 +102,10 @@
     // Show login overlay and hide logout button
     loginOverlay.style.display = 'flex';
     logoutBtn.style.display = 'none';
+    // Clear the current room display when logged out
+    if (roomDisplay) {
+      roomDisplay.textContent = '';
+    }
   }
 
   /**
@@ -267,6 +274,10 @@
     // Hide login overlay and show logout button
     loginOverlay.style.display = 'none';
     logoutBtn.style.display = 'block';
+    // Show the current room name in the header when logged in
+    if (roomDisplay) {
+      roomDisplay.textContent = 'ルーム: ' + roomName;
+    }
     // Start SSE for this room
     startSSE();
   });
@@ -287,6 +298,8 @@
         // Optionally clear inputs
         loginRoomInput.value = '';
         loginPassInput.value = '';
+        // Refresh the rooms list after deletion
+        fetchRooms();
       } else {
         alert('削除に失敗: ' + text);
       }
@@ -302,11 +315,15 @@
       fetch(`/logout?room=${encodeURIComponent(roomName)}&password=${encodeURIComponent(roomPass)}&name=${encodeURIComponent(userName)}`, { method: 'GET' });
     }
     resetSession();
+    // Refresh the rooms list after logging out (new rooms may have been created)
+    fetchRooms();
   });
 
   // Register service worker for PWA functionality
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
+      // Populate the list of available rooms on initial load
+      fetchRooms();
       navigator.serviceWorker
         .register('/service-worker.js')
         .then(() => {
@@ -315,6 +332,41 @@
         .catch((err) => {
           console.error('Service worker registration failed', err);
         });
+    });
+  }
+
+  /**
+   * Fetch the list of available rooms from the server and populate the
+   * dropdown. The first option remains a placeholder and is not removed.
+   */
+  async function fetchRooms() {
+    if (!roomsSelect) return;
+    try {
+      const resp = await fetch('/rooms');
+      if (!resp.ok) return;
+      const list = await resp.json();
+      // Remove existing options except the first placeholder
+      while (roomsSelect.options.length > 1) {
+        roomsSelect.remove(1);
+      }
+      list.forEach((room) => {
+        const opt = document.createElement('option');
+        opt.value = room;
+        opt.textContent = room;
+        roomsSelect.appendChild(opt);
+      });
+    } catch (err) {
+      console.error('Failed to fetch rooms', err);
+    }
+  }
+
+  // When a room is selected from the dropdown, update the room input
+  if (roomsSelect) {
+    roomsSelect.addEventListener('change', () => {
+      const val = roomsSelect.value;
+      if (val) {
+        loginRoomInput.value = val;
+      }
     });
   }
 })();
