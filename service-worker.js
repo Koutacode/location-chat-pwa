@@ -12,7 +12,10 @@
 // Bump the cache again because we refined fetch handling. Changing the
 // version triggers the service worker to reinstall and ensure clients
 // receive the latest code.
-const CACHE_NAME = 'location-chat-cache-v5';
+// Bump the cache version again because we switched Leaflet to jsdelivr.
+// Updating the cache name forces clients to fetch the latest assets,
+// including the new CDN URLs.
+const CACHE_NAME = 'location-chat-cache-v6';
 // List of resources to pre‑cache for offline use
 const STATIC_ASSETS = [
   '/',
@@ -21,8 +24,12 @@ const STATIC_ASSETS = [
   '/main.js',
   '/manifest.json',
   '/icon-512.png',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  // Use jsdelivr CDN for Leaflet assets instead of unpkg. The unpkg
+  // domain is blocked in some deployment environments, preventing the
+  // map from loading. jsdelivr is accessible and serves the same
+  // files.
+  'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css',
+  'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js',
 ];
 
 self.addEventListener('install', (event) => {

@@ -5,10 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#2196f3" />
   <link rel="manifest" href="manifest.json" />
+  <!-- Load Leaflet from jsdelivr instead of unpkg. The previous CDN
+       host (unpkg) is blocked in some environments, causing the map
+       to remain blank. jsdelivr provides the same files and is
+       accessible in our deployment environment. -->
   <link
     rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha512-sA+ePvMErc2A1bEJ+UoPuSL4lOib+Sl9HKGkgvO4WyiO2FY1yaRWZpOCM8Z6/s/ztqTYkN4jld+0uxyWDlRhFQ=="
+    href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha512-MxKZ1P6WD9b2G9dJVNy6N+PyVtD8rAYG4Ryg5o07PvVCMEQmcPGpfqoSywjjwgl7LftcyD3G5hOXo6tZdJYs6A=="
     crossorigin=""
   />
   <link rel="stylesheet" href="style.css" />
@@ -35,8 +39,8 @@
     </section>
   </main>
   <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha512-mcSw4xIu3faLrBwZkTPjK6l7AwUajFZxiqikZNxumY/dsZCoV1dJb8If3vdHHmM5qByGk6adChPgrZj6ZDejCQ=="
+    src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha512-kZ8aAmGij1ZT5u01DlKMm4bWJbzULSD0VI0FrCbHOUsDyBwpdG2GpH+cBr9Xr5xWQyRLlsVnphZFfr+9GpcHsw=="
     crossorigin=""
   ></script>
   <script src="main.js"></script>
