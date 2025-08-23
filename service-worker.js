@@ -1,5 +1,8 @@
 // Simple service worker for offline caching of static assets
-const CACHE_NAME = 'location-chat-cache-v1';
+// Bump the cache version to ensure clients fetch the latest assets when the
+// service worker is updated. Changing this name will cause the install
+// event to run again and replace any previously cached resources.
+const CACHE_NAME = 'location-chat-cache-v2';
 // List of resources to pre‑cache for offline use
 const STATIC_ASSETS = [
   '/',
