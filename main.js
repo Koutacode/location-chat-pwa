@@ -1,6 +1,17 @@
 // Client‑side script for the Location Chat PWA
 
 (() => {
+  // Global error handler: show a popup if any uncaught error occurs. This helps
+  // surface issues in production deployments where a silent error might
+  // prevent the UI from working as expected. Note: alerts are intrusive but
+  // useful for debugging. Remove or disable in final production builds.
+  window.addEventListener('error', (event) => {
+    try {
+      alert('Client error: ' + event.message);
+    } catch (_) {
+      // ignore if alert fails
+    }
+  });
   // Helper: format timestamp into readable HH:MM
   function formatTime(ts) {
     const date = new Date(ts);
