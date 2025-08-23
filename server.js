@@ -304,42 +304,48 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    // Endpoint to check whether a room exists and the password is correct.
-    // Returns 404 if the room does not exist, 403 if the password is wrong,
-    // and 200 if the password matches. This is used by the client to
-    // validate the password before allowing the user to join an existing room.
-    if (pathname === '/checkRoom' && req.method === 'GET') {
-      const roomName = url.searchParams.get('room') || 'default';
-      const password = url.searchParams.get('password') || '';
-      const roomObj = rooms[roomName];
-      if (!roomObj) {
-        res.writeHead(404);
-        res.end('not found');
-        return;
-      }
-      if (roomObj.password !== password) {
-        res.writeHead(403);
-        res.end('invalid');
-        return;
-      }
-      res.writeHead(200);
-      res.end('ok');
-      return;
-    }
     if (roomObj.password !== password) {
       res.writeHead(403);
       res.end('Invalid room password');
       return;
     }
-    // Only allow deletion if no clients are connected
-    if (roomObj.clients.size > 0) {
-      res.writeHead(409);
-      res.end('Room has active clients');
-      return;
+    // When a deletion is requested, close all active SSE connections for this
+    // room before deleting it. This ensures rooms can be removed even
+    // when clients are still connected. The clients will receive an EOF
+    // and should handle reconnection logic on the client side.
+    for (const client of Array.from(roomObj.clients)) {
+      try {
+        client.end();
+      } catch (err) {
+        // ignore failures; SSE connections will eventually close
+      }
     }
     delete rooms[roomName];
     res.writeHead(200);
     res.end('deleted');
+    return;
+  }
+
+  // Endpoint to check whether a room exists and the password is correct.
+  // Returns 404 if the room does not exist, 403 if the password is wrong,
+  // and 200 if the password matches. This is used by the client to
+  // validate the password before allowing the user to join an existing room.
+  if (pathname === '/checkRoom' && req.method === 'GET') {
+    const roomName = url.searchParams.get('room') || 'default';
+    const password = url.searchParams.get('password') || '';
+    const roomObj = rooms[roomName];
+    if (!roomObj) {
+      res.writeHead(404);
+      res.end('not found');
+      return;
+    }
+    if (roomObj.password !== password) {
+      res.writeHead(403);
+      res.end('invalid');
+      return;
+    }
+    res.writeHead(200);
+    res.end('ok');
     return;
   }
 
