@@ -79,6 +79,14 @@
             markers[name] = marker;
           }
         }
+        // If this update is for our current user, re-center the map. Without
+        // centering, the marker may be off-screen because the default view is
+        // central Japan. Only adjust for our own user.
+        if (name === userName) {
+          const currentZoom = map.getZoom();
+          const desiredZoom = currentZoom < 12 ? 12 : currentZoom;
+          map.setView([lat, lon], desiredZoom);
+        }
       }
 
   /**
