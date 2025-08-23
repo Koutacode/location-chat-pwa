@@ -15,7 +15,10 @@
 // Bump the cache version again because we switched Leaflet to jsdelivr.
 // Updating the cache name forces clients to fetch the latest assets,
 // including the new CDN URLs.
-const CACHE_NAME = 'location-chat-cache-v6';
+// Bump cache again because we removed SRI attributes from Leaflet resources to
+// prevent CDN integrity mismatches. Changing the cache name forces
+// clients to download the updated index.html.
+const CACHE_NAME = 'location-chat-cache-v7';
 // List of resources to pre‑cache for offline use
 const STATIC_ASSETS = [
   '/',
