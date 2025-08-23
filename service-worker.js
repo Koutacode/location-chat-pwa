@@ -9,7 +9,10 @@
 // Bump the cache again because we updated main.js to center the map on
 // the user's location. Changing the cache name forces the service worker
 // to reinstall and fetch the latest assets.
-const CACHE_NAME = 'location-chat-cache-v4';
+// Bump the cache again because we refined fetch handling. Changing the
+// version triggers the service worker to reinstall and ensure clients
+// receive the latest code.
+const CACHE_NAME = 'location-chat-cache-v5';
 // List of resources to pre‑cache for offline use
 const STATIC_ASSETS = [
   '/',
@@ -46,6 +49,14 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   // Only handle GET requests; let other requests pass through
   if (request.method !== 'GET') {
+    return;
+  }
+  const url = new URL(request.url);
+  // Only intercept same‑origin requests. This prevents the service worker
+  // from interfering with requests to other domains (e.g., unpkg.com or
+  // openstreetmap.org). Without this check, the service worker can cause
+  // unrelated pages to load our cached responses or appear blocked.
+  if (url.origin !== self.location.origin) {
     return;
   }
   event.respondWith(
