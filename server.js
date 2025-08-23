@@ -303,6 +303,29 @@ const server = http.createServer((req, res) => {
       res.end('Room not found');
       return;
     }
+
+    // Endpoint to check whether a room exists and the password is correct.
+    // Returns 404 if the room does not exist, 403 if the password is wrong,
+    // and 200 if the password matches. This is used by the client to
+    // validate the password before allowing the user to join an existing room.
+    if (pathname === '/checkRoom' && req.method === 'GET') {
+      const roomName = url.searchParams.get('room') || 'default';
+      const password = url.searchParams.get('password') || '';
+      const roomObj = rooms[roomName];
+      if (!roomObj) {
+        res.writeHead(404);
+        res.end('not found');
+        return;
+      }
+      if (roomObj.password !== password) {
+        res.writeHead(403);
+        res.end('invalid');
+        return;
+      }
+      res.writeHead(200);
+      res.end('ok');
+      return;
+    }
     if (roomObj.password !== password) {
       res.writeHead(403);
       res.end('Invalid room password');

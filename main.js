@@ -259,14 +259,35 @@
     });
   }
 
-  // Handle login button: collect credentials and start session
-  loginBtn.addEventListener('click', () => {
+  // Handle login button: collect credentials and start session. Before
+  // proceeding, validate the password for existing rooms via the
+  // /checkRoom endpoint. If the password is wrong, display an error and
+  // do not proceed.
+  loginBtn.addEventListener('click', async () => {
     const nameVal = loginNameInput.value.trim();
     const roomVal = loginRoomInput.value.trim();
     const passVal = loginPassInput.value;
     if (!nameVal || !roomVal) {
       alert('名前とルーム名を入力してください');
       return;
+    }
+    try {
+      // Verify password for existing rooms. If the room does not exist
+      // yet, the server returns 404 and we treat it as a new room. If the
+      // password is incorrect, the server returns 403 and we abort.
+      const respCheck = await fetch(
+        `/checkRoom?room=${encodeURIComponent(roomVal)}&password=${encodeURIComponent(passVal)}`,
+        { method: 'GET' }
+      );
+      if (respCheck.status === 403) {
+        alert('パスワードが間違っています');
+        return;
+      }
+      // If status is 404 (room does not exist) or 200 (password matches),
+      // proceed to join/create the room.
+    } catch (err) {
+      // Network or other errors shouldn't block room creation. Log and continue.
+      console.error('パスワード確認中にエラーが発生しました', err);
     }
     userName = nameVal;
     roomName = roomVal;
