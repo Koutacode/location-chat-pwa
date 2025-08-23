@@ -35,11 +35,26 @@
   const sendBtn = document.getElementById('send-btn');
   const shareBtn = document.getElementById('share-btn');
 
-  // Initialize map using Leaflet
-  const map = L.map('map').setView([35.0, 135.0], 3); // Default to Japan
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors',
-  }).addTo(map);
+      // Initialize map using Leaflet if available. Some deployment
+      // environments may block external scripts (like Leaflet from unpkg),
+      // which would leave `L` undefined. Guard against this so the rest of
+      // the app (chat and location sharing) can still function without
+      // throwing errors. When Leaflet is unavailable, the map element
+      // remains blank and markers are ignored.
+      let map = null;
+      try {
+        if (typeof L !== 'undefined') {
+          map = L.map('map').setView([35.0, 135.0], 3); // Default to Japan
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+          }).addTo(map);
+        } else {
+          console.warn('Leaflet library is not loaded; map disabled');
+        }
+      } catch (err) {
+        console.error('Failed to initialize map:', err);
+        map = null;
+      }
 
   // Store markers keyed by user name
   const markers = {};
@@ -51,15 +66,20 @@
    * @param {number} lat Latitude
    * @param {number} lon Longitude
    */
-  function updateMarker(name, lat, lon) {
-    if (markers[name]) {
-      markers[name].setLatLng([lat, lon]);
-    } else {
-      const marker = L.marker([lat, lon]).addTo(map);
-      marker.bindPopup(name);
-      markers[name] = marker;
-    }
-  }
+      function updateMarker(name, lat, lon) {
+        // Only attempt to update markers if a map is available
+        if (!map) return;
+        if (markers[name]) {
+          markers[name].setLatLng([lat, lon]);
+        } else {
+          // Guard against L being undefined
+          if (typeof L !== 'undefined') {
+            const marker = L.marker([lat, lon]).addTo(map);
+            marker.bindPopup(name);
+            markers[name] = marker;
+          }
+        }
+      }
 
   /**
    * Append a message to the chat area.
