@@ -144,7 +144,38 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-    // Serve static files from the project root rather than a dedicated
+    
+  // Endpoint to post new chat messages via GET (for platforms that disallow POST)
+  if (pathname === '/message' && req.method === 'GET') {
+    const name = url.searchParams.get('name');
+    const textParam = url.searchParams.get('text');
+    if (name && textParam) {
+      const msg = { name, text: textParam, time: Date.now() };
+      messages.push(msg);
+      if (messages.length > 200) messages.shift();
+      broadcast('message', msg);
+    }
+    res.writeHead(200);
+    res.end('ok');
+    return;
+  }
+
+  // Endpoint to post location updates via GET (for platforms that disallow POST)
+  if (pathname === '/location' && req.method === 'GET') {
+    const name = url.searchParams.get('name');
+    const latParam = parseFloat(url.searchParams.get('lat'));
+    const lonParam = parseFloat(url.searchParams.get('lon'));
+    if (name && !isNaN(latParam) && !isNaN(lonParam)) {
+      const loc = { name, lat: latParam, lon: lonParam, time: Date.now() };
+      locations[name] = loc;
+      broadcast('location', loc);
+    }
+    res.writeHead(200);
+    res.end('ok');
+    return;
+  }
+
+// Serve static files from the project root rather than a dedicated
   // `public` directory. By using the project root as the static
   // directory, we can deploy the application to platforms like
   // Render without needing to create a nested "public" folder in the

@@ -79,13 +79,10 @@
    * Send a chat message to the server.
    */
   function sendMessage() {
-    const text = inputEl.value.trim();
-    if (!text) return;
-    fetch('/message', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: userName, text }),
-    });
+    const textVal = inputEl.value.trim();
+    if (!textVal) return;
+    const url = `/message?name=${encodeURIComponent(userName)}&text=${encodeURIComponent(textVal)}`;
+    fetch(url, { method: 'GET' });
     inputEl.value = '';
   }
 
@@ -109,11 +106,8 @@
     watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        fetch('/location', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: userName, lat: latitude, lon: longitude }),
-        });
+        const urlLoc = `/location?name=${encodeURIComponent(userName)}&lat=${latitude}&lon=${longitude}`;
+        fetch(urlLoc, { method: 'GET' });
       },
       (err) => {
         console.error(err);
