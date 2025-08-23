@@ -2,7 +2,11 @@
 // Bump the cache version to ensure clients fetch the latest assets when the
 // service worker is updated. Changing this name will cause the install
 // event to run again and replace any previously cached resources.
-const CACHE_NAME = 'location-chat-cache-v2';
+// Bump the cache version again because we updated main.js with a
+// global error handler. Incrementing this value ensures clients
+// download the latest script instead of using a cached one. Each
+// release should increment this value to invalidate old assets.
+const CACHE_NAME = 'location-chat-cache-v3';
 // List of resources to pre‑cache for offline use
 const STATIC_ASSETS = [
   '/',
