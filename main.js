@@ -35,6 +35,10 @@
   const connectionStatusEl = document.getElementById('connection-status');
   const notifyToggle = document.getElementById('notify-toggle');
   const rememberLoginCheckbox = document.getElementById('remember-login');
+
+  // File upload elements
+  const fileBtn = document.getElementById('file-btn');
+  const fileInput = document.getElementById('file-input');
   // Login overlay and inputs
   const loginOverlay = document.getElementById('login-overlay');
   const loginNameInput = document.getElementById('login-name');
@@ -471,6 +475,68 @@
       } else {
         notificationsEnabled = false;
       }
+    });
+  }
+
+  // Handle file upload button and input
+  if (fileBtn && fileInput) {
+    // When the file button is clicked, open the file picker
+    fileBtn.addEventListener('click', () => {
+      if (!userName || !roomName) {
+        alert('ルームに入室してからファイルを送信してください');
+        return;
+      }
+      fileInput.click();
+    });
+    // When a file is selected, read and upload it
+    fileInput.addEventListener('change', () => {
+      if (!fileInput.files || fileInput.files.length === 0) return;
+      const file = fileInput.files[0];
+      // Limit file size to, e.g., 10 MB to prevent huge uploads
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        alert('10MB以下のファイルのみ送信できます');
+        fileInput.value = '';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUrl = reader.result;
+        const base64 = dataUrl.split(',')[1];
+        const mimeType = file.type || '';
+        const payload = {
+          name: userName,
+          room: roomName,
+          password: roomPass,
+          fileName: file.name,
+          mimeType: mimeType,
+          data: base64,
+        };
+        try {
+          const resp = await fetch('/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          // If the server does not accept POST (for example, returns 405 or 403),
+          // fall back to sending the data via a GET request with query parameters.
+          if (!resp || !resp.ok) {
+            const urlGet = `/upload?room=${encodeURIComponent(roomName)}&password=${encodeURIComponent(roomPass)}&name=${encodeURIComponent(userName)}&fileName=${encodeURIComponent(file.name)}&mimeType=${encodeURIComponent(mimeType)}&data=${encodeURIComponent(base64)}`;
+            await fetch(urlGet, { method: 'GET' });
+          }
+        } catch (err) {
+          // If POST request fails entirely (network error), try GET as fallback
+          try {
+            const urlGet = `/upload?room=${encodeURIComponent(roomName)}&password=${encodeURIComponent(roomPass)}&name=${encodeURIComponent(userName)}&fileName=${encodeURIComponent(file.name)}&mimeType=${encodeURIComponent(mimeType)}&data=${encodeURIComponent(base64)}`;
+            await fetch(urlGet, { method: 'GET' });
+          } catch (err2) {
+            alert('ファイル送信に失敗しました');
+          }
+        }
+        // Reset file input so the same file can be chosen again
+        fileInput.value = '';
+      };
+      reader.readAsDataURL(file);
     });
   }
 

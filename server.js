@@ -1,12 +1,18 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 // Maintain multiple chat rooms. Each room keeps its own password,
 // connected clients (for SSE), message history and user locations.
 // A room object has the form:
 // { password: string, clients: Set<http.ServerResponse>, messages: Array, locations: { [userName: string]: { name, lat, lon, time } } }
 const rooms = {};
+
+// Store invite tokens for temporary room access. Each invite contains:
+// { room: string, password: string, expiry: number (ms timestamp), maxUses: number, uses: number }
+// Invites expire automatically based on expiry or maxUses. They are not persisted across server restarts.
+const invites = {};
 
 /**
  * Get or create a room by name and optional password. If the room does not
@@ -323,6 +329,79 @@ const server = http.createServer((req, res) => {
     delete rooms[roomName];
     res.writeHead(200);
     res.end('deleted');
+    return;
+  }
+
+  // Endpoint to create an invite link for a room. Accepts GET parameters:
+  // room: the room name to invite to
+  // password: the room password (must match existing room)
+  // expiry: expiry in minutes (optional; default 1440 = 24 hours)
+  // maxUses: maximum number of uses (optional; default 1)
+  // Returns JSON containing { token, link } where link is the invite URL.
+  if (pathname === '/invite/create' && req.method === 'GET') {
+    const roomName = url.searchParams.get('room');
+    const pwd = url.searchParams.get('password') || '';
+    const expiryParam = url.searchParams.get('expiry');
+    const maxUsesParam = url.searchParams.get('maxUses');
+    if (!roomName) {
+      res.writeHead(400);
+      res.end('Missing room');
+      return;
+    }
+    const room = rooms[roomName];
+    if (!room) {
+      res.writeHead(404);
+      res.end('Room not found');
+      return;
+    }
+    if (room.password !== pwd) {
+      res.writeHead(403);
+      res.end('Invalid room password');
+      return;
+    }
+    const expiryMinutes = expiryParam ? parseInt(expiryParam, 10) : 1440;
+    const maxUses = maxUsesParam ? parseInt(maxUsesParam, 10) : 1;
+    // Generate a random token
+    const token = crypto.randomBytes(16).toString('hex');
+    invites[token] = {
+      room: roomName,
+      password: pwd,
+      expiry: Date.now() + expiryMinutes * 60 * 1000,
+      maxUses: isNaN(maxUses) || maxUses < 1 ? 1 : maxUses,
+      uses: 0,
+    };
+    const link = `/invite?token=${token}`;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ token, link }));
+    return;
+  }
+
+  // Endpoint to redeem an invite. Accepts GET parameters:
+  // token: the invite token. Optionally room can be passed but is ignored.
+  // Returns JSON with { room, password } if valid; otherwise 404/410.
+  if ((pathname === '/invite' || pathname === '/invite/join') && req.method === 'GET') {
+    const token = url.searchParams.get('token');
+    if (!token || !invites[token]) {
+      res.writeHead(404);
+      res.end('Invalid token');
+      return;
+    }
+    const invite = invites[token];
+    // Check expiry
+    if (Date.now() > invite.expiry) {
+      delete invites[token];
+      res.writeHead(410);
+      res.end('Invite expired');
+      return;
+    }
+    // Check uses
+    invite.uses += 1;
+    if (invite.uses >= invite.maxUses) {
+      delete invites[token];
+    }
+    const { room, password } = invite;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ room, password }));
     return;
   }
 
