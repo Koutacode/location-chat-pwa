@@ -26,7 +26,12 @@
 // the cache name forces clients to refresh cached assets and load the
 // latest index.html, manifest.json and main.js files with the new
 // features and app title.
-const CACHE_NAME = 'location-chat-cache-v9';
+// Bump cache version because we've added invite functionality, notification toggles,
+// status bar, reconnection logic and login persistence. Incrementing the cache
+// name forces clients to refresh cached assets and load the latest versions
+// of index.html, style.css, main.js and service-worker.js with these new
+// features.
+const CACHE_NAME = 'location-chat-cache-v10';
 // List of resources to pre‑cache for offline use
 const STATIC_ASSETS = [
   '/',

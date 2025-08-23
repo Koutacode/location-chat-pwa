@@ -90,6 +90,55 @@ main {
   cursor: pointer;
 }
 
+/* Invite button styling: similar to send and share buttons */
+#invite-btn {
+  margin-left: 6px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  background-color: #4caf50;
+  color: #fff;
+  font-size: 1em;
+  cursor: pointer;
+}
+#invite-btn:hover {
+  background-color: #388e3c;
+}
+
+/* Status bar at bottom showing connection state and notification toggle */
+#status-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 6px;
+  font-size: 0.8em;
+  background-color: #f0f0f0;
+  border-top: 1px solid #ddd;
+  z-index: 800;
+}
+#status-bar span {
+  color: #333;
+}
+#notify-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Remember login checkbox container styling */
+#remember-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 80%;
+  max-width: 300px;
+}
+
 #send-btn:hover,
 #share-btn:hover {
   background-color: #1976d2;
@@ -132,6 +181,22 @@ main {
   border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 1em;
+}
+
+/* Select for choosing existing rooms */
+#rooms-select {
+  width: 80%;
+  max-width: 300px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1em;
+  background-color: #fff;
+}
+
+/* Style for current room display in header */
+#room-display {
+  font-weight: normal;
 }
 
 #login-overlay button {
