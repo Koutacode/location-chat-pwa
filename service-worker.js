@@ -21,7 +21,12 @@
 // Bump cache version because we've added room functionality, login overlay,
 // and other features. Updating the cache name forces clients to fetch the
 // latest assets, ensuring the new UI and logic are loaded.
-const CACHE_NAME = 'location-chat-cache-v8';
+// Bump cache version again because we added room persistence, room list
+// display, and renamed the application to KOTACHAT. Incrementing
+// the cache name forces clients to refresh cached assets and load the
+// latest index.html, manifest.json and main.js files with the new
+// features and app title.
+const CACHE_NAME = 'location-chat-cache-v9';
 // List of resources to pre‑cache for offline use
 const STATIC_ASSETS = [
   '/',
