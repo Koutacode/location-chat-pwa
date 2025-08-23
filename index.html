@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#2196f3" />
+  <link rel="manifest" href="manifest.json" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha512-sA+ePvMErc2A1bEJ+UoPuSL4lOib+Sl9HKGkgvO4WyiO2FY1yaRWZpOCM8Z6/s/ztqTYkN4jld+0uxyWDlRhFQ=="
+    crossorigin=""
+  />
+  <link rel="stylesheet" href="style.css" />
+  <title>位置情報チャットアプリ</title>
+</head>
+<body>
+  <header>
+    <h1>位置情報チャットアプリ</h1>
+  </header>
+  <main>
+    <div id="map"></div>
+    <section id="chat">
+      <div id="messages"></div>
+      <div id="input-area">
+        <input
+          id="message-input"
+          type="text"
+          placeholder="メッセージを入力…"
+          autocomplete="off"
+        />
+        <button id="send-btn">送信</button>
+        <button id="share-btn">位置共有開始</button>
+      </div>
+    </section>
+  </main>
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha512-mcSw4xIu3faLrBwZkTPjK6l7AwUajFZxiqikZNxumY/dsZCoV1dJb8If3vdHHmM5qByGk6adChPgrZj6ZDejCQ=="
+    crossorigin=""
+  ></script>
+  <script src="main.js"></script>
+</body>
+</html>
