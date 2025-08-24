@@ -606,7 +606,11 @@
   }
 
 
-  // Register service worker for PWA functionality
+  // Register service worker for PWA functionality.
+  // To ensure that users always receive the latest assets, first unregister any
+  // existing service workers before registering the current one. Without this
+  // step, older service workers may continue to serve stale cached files,
+  // causing the UI to appear outdated.
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       // Load saved login details before populating rooms
@@ -617,12 +621,26 @@
         fetchRooms();
       });
       navigator.serviceWorker
-        .register('/service-worker.js')
-        .then(() => {
-          console.log('Service worker registered');
+        .getRegistrations()
+        .then((regs) => {
+          return Promise.all(
+            regs.map((reg) => {
+              return reg.unregister();
+            }),
+          );
         })
-        .catch((err) => {
-          console.error('Service worker registration failed', err);
+        .catch(() => {
+          // Ignore errors during unregister; likely no service workers yet
+        })
+        .finally(() => {
+          navigator.serviceWorker
+            .register('/service-worker.js', { updateViaCache: 'none' })
+            .then(() => {
+              console.log('Service worker registered (updated)');
+            })
+            .catch((err) => {
+              console.error('Service worker registration failed', err);
+            });
         });
     });
   }
