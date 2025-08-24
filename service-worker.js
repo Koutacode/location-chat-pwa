@@ -36,7 +36,10 @@
 // Incrementing the cache name forces clients to refresh cached assets and
 // load the latest versions of index.html, style.css, main.js and
 // service-worker.js with these new features.
-const CACHE_NAME = 'location-chat-cache-v11';
+// Bump the cache version because we added file upload UI and adjusted overscroll
+// behavior to prevent pull-to-refresh on mobile. Changing the cache name
+// forces clients to fetch the latest assets (index.html, style.css, main.js).
+const CACHE_NAME = 'location-chat-cache-v14';
 // List of resources to pre‑cache for offline use
 const STATIC_ASSETS = [
   '/',
