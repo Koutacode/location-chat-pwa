@@ -3,12 +3,23 @@
   box-sizing: border-box;
 }
 
+/* Prevent pull-to-refresh/overscroll on the root element in mobile browsers.
+   This setting ensures that scrolling to the top does not cause the page to
+   refresh back to the login screen. */
+html {
+  overscroll-behavior: none;
+}
+
 body {
   margin: 0;
   font-family: sans-serif;
   height: 100vh;
   display: flex;
   flex-direction: column;
+  /* Prevent pull-to-refresh/overscroll on mobile. Setting overscroll-behavior
+     to none stops the browser from triggering a page refresh when the user
+     scrolls past the top of the page on touch devices. */
+  overscroll-behavior: none;
 }
 
 header {
@@ -63,6 +74,29 @@ main {
   margin-left: 4px;
 }
 
+/* Toolbar inside chat: file/share/invite buttons and status/notification controls */
+#toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 8px;
+  background-color: #f0f0f0;
+  border-top: 1px solid #ddd;
+}
+#connection-status {
+  font-size: 0.85em;
+  color: #333;
+}
+#notify-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85em;
+  color: #333;
+}
+
+/* Input area: message input and send button */
 #input-area {
   display: flex;
   flex-wrap: wrap;
@@ -80,9 +114,9 @@ main {
   font-size: 1em;
 }
 
+/* Primary buttons: send and share */
 #send-btn,
 #share-btn {
-  margin-left: 6px;
   padding: 6px 12px;
   border: none;
   border-radius: 4px;
@@ -92,9 +126,8 @@ main {
   cursor: pointer;
 }
 
-/* Invite button styling: similar to send and share buttons */
+/* Invite button styling */
 #invite-btn {
-  margin-left: 6px;
   padding: 6px 12px;
   border: none;
   border-radius: 4px;
@@ -109,7 +142,6 @@ main {
 
 /* File upload button styling: purple theme */
 #file-btn {
-  margin-left: 6px;
   padding: 6px 12px;
   border: none;
   border-radius: 4px;
@@ -122,26 +154,9 @@ main {
   background-color: #7b1fa2;
 }
 
-/* Status bar inside chat: shows connection state and notification toggle */
-#status-bar {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 6px;
-  font-size: 0.8em;
-  background-color: #f0f0f0;
-  border-top: 1px solid #ddd;
-}
-#status-bar span {
-  color: #333;
-}
-#notify-container {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
+/* Remove old status bar styles as replaced by toolbar */
+/* (empty placeholder to override any remaining status-bar definitions) */
+/* #status-bar { display: none; } */
 
 /* Remember login checkbox container styling */
 #remember-container {
