@@ -114,6 +114,43 @@ function serveStatic(filePath, res) {
 }
 
 /**
+ * Read and parse a JSON request body. This utility ensures UTF-8 decoding
+ * across chunk boundaries so multibyte characters (e.g. Japanese file names)
+ * are reconstructed correctly. The request is rejected if it exceeds the
+ * specified size limit.
+ *
+ * @param {http.IncomingMessage} req Incoming request object
+ * @param {number} [limit=15*1024*1024] Maximum bytes allowed
+ * @returns {Promise<Object>} Parsed JSON object (empty object on failure)
+ */
+// Read and parse JSON request body. Rejects on errors or payloads that exceed
+// the given limit so callers can surface meaningful HTTP status codes.
+function readJson(req, limit = 15 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let total = 0;
+    req.on('data', (chunk) => {
+      total += chunk.length;
+      if (total > limit) {
+        req.destroy();
+        reject(new Error('Payload too large'));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      try {
+        const body = Buffer.concat(chunks).toString('utf8');
+        resolve(JSON.parse(body || '{}'));
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+/**
  * Create the HTTP server. This handles SSE connections, message and
  * location updates, and serves static files from the public directory.
  */
@@ -161,15 +198,10 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Endpoint to post new chat messages (POST) – now includes room and password parameters in body
+  // Endpoint to post new chat messages (POST)
   if (pathname === '/message' && req.method === 'POST') {
-    let body = '';
-    req.on('data', (chunk) => {
-      body += chunk;
-    });
-    req.on('end', () => {
-      try {
-        const { name, text, room, password } = JSON.parse(body || '{}');
+    readJson(req)
+      .then(({ name, text, room, password }) => {
         const roomName = room || 'default';
         const roomObj = getOrCreateRoom(roomName, password || '');
         if (!roomObj) {
@@ -180,28 +212,23 @@ const server = http.createServer((req, res) => {
         if (name && text) {
           const msg = { name, text, time: Date.now() };
           roomObj.messages.push(msg);
-          // Trim the message history to avoid unbounded growth
           if (roomObj.messages.length > 200) roomObj.messages.shift();
           broadcast(roomName, 'message', msg);
         }
-      } catch (err) {
-        // Ignore malformed payloads
-      }
-      res.writeHead(200);
-      res.end('ok');
-    });
+        res.writeHead(200);
+        res.end('ok');
+      })
+      .catch(() => {
+        res.writeHead(400);
+        res.end('Invalid JSON');
+      });
     return;
   }
 
-  // Endpoint to post location updates (POST) – includes room and password in body
+  // Endpoint to post location updates (POST)
   if (pathname === '/location' && req.method === 'POST') {
-    let body = '';
-    req.on('data', (chunk) => {
-      body += chunk;
-    });
-    req.on('end', () => {
-      try {
-        const { name, lat, lon, room, password } = JSON.parse(body || '{}');
+    readJson(req)
+      .then(({ name, lat, lon, room, password }) => {
         const roomName = room || 'default';
         const roomObj = getOrCreateRoom(roomName, password || '');
         if (!roomObj) {
@@ -214,12 +241,13 @@ const server = http.createServer((req, res) => {
           roomObj.locations[name] = loc;
           broadcast(roomName, 'location', loc);
         }
-      } catch (err) {
-        // Ignore malformed payloads
-      }
-      res.writeHead(200);
-      res.end('ok');
-    });
+        res.writeHead(200);
+        res.end('ok');
+      })
+      .catch(() => {
+        res.writeHead(400);
+        res.end('Invalid JSON');
+      });
     return;
   }
 
@@ -450,6 +478,10 @@ const server = http.createServer((req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Location chat server running on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`Location chat server running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = server;

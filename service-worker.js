@@ -42,7 +42,10 @@
 // Bump the cache version again because we modified service worker registration
 // logic in main.js to forcibly unregister old service workers. Changing the
 // cache name ensures browsers fetch this updated service worker and cache.
-const CACHE_NAME = 'location-chat-cache-v15';
+// Bump cache version again because the file upload feature was removed.
+// Updating the cache name forces clients to fetch assets without the
+// upload UI and scripts.
+const CACHE_NAME = 'location-chat-cache-v18';
 // List of resources to pre‑cache for offline use
 const STATIC_ASSETS = [
   '/',
