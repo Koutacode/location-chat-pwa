@@ -450,6 +450,10 @@ const server = http.createServer((req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Location chat server running on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`Location chat server running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = server;

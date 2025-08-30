@@ -46,6 +46,10 @@ main {
   display: flex;
   flex-direction: column;
   border-top: 1px solid #ddd;
+  /* Ensure the chat panel sits above the map and provides a positioning
+     context for sticky children such as the input area. */
+  position: relative;
+  z-index: 1;
 }
 
 #messages {
@@ -104,6 +108,10 @@ main {
   padding: 8px;
   background-color: #eee;
   border-top: 1px solid #ddd;
+  /* Anchor the input area to the bottom of the chat panel so that it does
+     not overlap the map or messages when the layout changes. */
+  position: sticky;
+  bottom: 0;
 }
 
 #message-input {
