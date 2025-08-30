@@ -149,18 +149,16 @@
             marker.bindPopup(name);
             markers[name] = marker;
           }
-        }
-        // If this update is for our current user, re-center the map. Without
-        // centering, the marker may be off-screen because the default view is
-        // central Japan. Only adjust for our own user.
-        if (name === userName) {
-          const currentZoom = map.getZoom();
-          const desiredZoom = currentZoom < 12 ? 12 : currentZoom;
-          map.setView([lat, lon], desiredZoom);
-        }
+    // If this update is for our current user, re-center the map only once
+    if (name === userName) {
+      const currentZoom = map.getZoom();
+      const desiredZoom = currentZoom < 12 ? 12 : currentZoom;
+      if (!updateMarker.hasCentered) {
+        map.setView([lat, lon], desiredZoom);
+        updateMarker.hasCentered = true;
       }
-
-  /**
+    }
+   
    * Append a message to the chat area.
    *
    * @param {Object} msg Message object with name, text, time
