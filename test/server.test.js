@@ -76,6 +76,37 @@ test('file upload broadcasts to room', async () => {
   controller.abort();
 });
 
+test('POST upload handles multibyte filenames', async () => {
+  const base = `http://localhost:${port}`;
+  const data = Buffer.from('hello').toString('base64');
+  const resp = await fetch(`${base}/upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      room: 'uploadjp',
+      password: 'pass',
+      name: 'Alice',
+      fileName: '写真.txt',
+      mimeType: 'text/plain',
+      data,
+    }),
+  });
+  assert.equal(resp.status, 200);
+
+  const controller = new AbortController();
+  const res = await fetch(`${base}/events?room=uploadjp&password=pass`, { signal: controller.signal });
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  while (!buf.includes('写真')) {
+    const { done, value } = await reader.read();
+    assert.ok(!done, 'stream ended before file message');
+    buf += dec.decode(value);
+  }
+  assert.match(buf, /"fileName":"写真.txt"/);
+  controller.abort();
+});
+
 test('SSE streams history and logout broadcasts removal', async () => {
   const base = `http://localhost:${port}`;
   // Preload history then connect to SSE and verify it is delivered

@@ -539,17 +539,23 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
-          // If the server does not accept POST (for example, returns 405 or 403),
-          // fall back to sending the data via a GET request with query parameters.
-          if (!resp || !resp.ok) {
+          let ok = resp && resp.ok;
+          if (!ok) {
             const urlGet = `/upload?room=${encodeURIComponent(roomName)}&password=${encodeURIComponent(roomPass)}&name=${encodeURIComponent(userName)}&fileName=${encodeURIComponent(file.name)}&mimeType=${encodeURIComponent(mimeType)}&data=${encodeURIComponent(base64)}`;
-            await fetch(urlGet, { method: 'GET' });
+            const resp2 = await fetch(urlGet, { method: 'GET' });
+            ok = resp2 && resp2.ok;
+          }
+          if (!ok) {
+            alert('ファイル送信に失敗しました');
           }
         } catch (err) {
           // If POST request fails entirely (network error), try GET as fallback
           try {
             const urlGet = `/upload?room=${encodeURIComponent(roomName)}&password=${encodeURIComponent(roomPass)}&name=${encodeURIComponent(userName)}&fileName=${encodeURIComponent(file.name)}&mimeType=${encodeURIComponent(mimeType)}&data=${encodeURIComponent(base64)}`;
-            await fetch(urlGet, { method: 'GET' });
+            const resp2 = await fetch(urlGet, { method: 'GET' });
+            if (!resp2 || !resp2.ok) {
+              alert('ファイル送信に失敗しました');
+            }
           } catch (err2) {
             alert('ファイル送信に失敗しました');
           }
