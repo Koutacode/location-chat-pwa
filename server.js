@@ -223,6 +223,37 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Endpoint to upload file attachments (POST)
+  if (pathname === '/upload' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+    });
+    req.on('end', () => {
+      try {
+        const { name, room, password, fileName, mimeType, data } = JSON.parse(body || '{}');
+        const roomName = room || 'default';
+        const roomObj = getOrCreateRoom(roomName, password || '');
+        if (!roomObj) {
+          res.writeHead(403);
+          res.end('Invalid room password');
+          return;
+        }
+        if (name && fileName && data) {
+          const msg = { name, fileName, mimeType: mimeType || '', data, time: Date.now() };
+          roomObj.messages.push(msg);
+          if (roomObj.messages.length > 200) roomObj.messages.shift();
+          broadcast(roomName, 'message', msg);
+        }
+      } catch (err) {
+        // Ignore malformed payloads
+      }
+      res.writeHead(200);
+      res.end('ok');
+    });
+    return;
+  }
+
     
   // Endpoint to post new chat messages via GET (for platforms that disallow POST)
   if (pathname === '/message' && req.method === 'GET') {
@@ -264,6 +295,31 @@ const server = http.createServer((req, res) => {
       const loc = { name, lat: latParam, lon: lonParam, time: Date.now() };
       roomObj.locations[name] = loc;
       broadcast(roomName, 'location', loc);
+    }
+    res.writeHead(200);
+    res.end('ok');
+    return;
+  }
+
+  // Endpoint to upload file attachments via GET (fallback)
+  if (pathname === '/upload' && req.method === 'GET') {
+    const roomName = url.searchParams.get('room') || 'default';
+    const password = url.searchParams.get('password') || '';
+    const name = url.searchParams.get('name');
+    const fileName = url.searchParams.get('fileName');
+    const mimeType = url.searchParams.get('mimeType') || '';
+    const data = url.searchParams.get('data');
+    const roomObj = getOrCreateRoom(roomName, password);
+    if (!roomObj) {
+      res.writeHead(403);
+      res.end('Invalid room password');
+      return;
+    }
+    if (name && fileName && data) {
+      const msg = { name, fileName, mimeType, data, time: Date.now() };
+      roomObj.messages.push(msg);
+      if (roomObj.messages.length > 200) roomObj.messages.shift();
+      broadcast(roomName, 'message', msg);
     }
     res.writeHead(200);
     res.end('ok');

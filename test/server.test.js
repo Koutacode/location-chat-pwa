@@ -57,6 +57,25 @@ test('deleteRoom removes room', async () => {
   assert.equal(res.status, 404);
 });
 
+test('file upload broadcasts to room', async () => {
+  const base = `http://localhost:${port}`;
+  const data = Buffer.from('hello').toString('base64');
+  await fetch(`${base}/upload?room=upload&password=pass&name=Bob&fileName=test.txt&mimeType=text/plain&data=${data}`);
+
+  const controller = new AbortController();
+  const res = await fetch(`${base}/events?room=upload&password=pass`, { signal: controller.signal });
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  while (!buf.includes('fileName')) {
+    const { done, value } = await reader.read();
+    assert.ok(!done, 'stream ended before file message');
+    buf += dec.decode(value);
+  }
+  assert.match(buf, /"fileName":"test.txt"/);
+  controller.abort();
+});
+
 test('SSE streams history and logout broadcasts removal', async () => {
   const base = `http://localhost:${port}`;
   // Preload history then connect to SSE and verify it is delivered

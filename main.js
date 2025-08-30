@@ -177,12 +177,33 @@
     const timeSpan = document.createElement('span');
     timeSpan.className = 'time';
     timeSpan.textContent = formatTime(msg.time);
-    const textSpan = document.createElement('span');
-    textSpan.className = 'text';
-    textSpan.textContent = ' ' + msg.text;
     wrapper.appendChild(nameSpan);
     wrapper.appendChild(timeSpan);
-    wrapper.appendChild(textSpan);
+    if (msg.text) {
+      const textSpan = document.createElement('span');
+      textSpan.className = 'text';
+      textSpan.textContent = ' ' + msg.text;
+      wrapper.appendChild(textSpan);
+    }
+    if (msg.data && msg.mimeType) {
+      if (msg.mimeType.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.src = `data:${msg.mimeType};base64,${msg.data}`;
+        img.alt = msg.fileName || '';
+        wrapper.appendChild(img);
+      } else if (msg.mimeType.startsWith('video/')) {
+        const video = document.createElement('video');
+        video.src = `data:${msg.mimeType};base64,${msg.data}`;
+        video.controls = true;
+        wrapper.appendChild(video);
+      } else {
+        const link = document.createElement('a');
+        link.href = `data:${msg.mimeType};base64,${msg.data}`;
+        link.download = msg.fileName || 'file';
+        link.textContent = msg.fileName || 'download';
+        wrapper.appendChild(link);
+      }
+    }
     messagesEl.appendChild(wrapper);
     // Scroll to bottom
     messagesEl.scrollTop = messagesEl.scrollHeight;

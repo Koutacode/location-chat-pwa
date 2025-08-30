@@ -78,6 +78,20 @@ main {
   margin-left: 4px;
 }
 
+.message img,
+.message video {
+  max-width: 100%;
+  display: block;
+  margin-top: 4px;
+  border-radius: 4px;
+}
+
+.message a {
+  display: inline-block;
+  margin-top: 4px;
+  word-break: break-all;
+}
+
 /* Toolbar inside chat: file/share/invite buttons and status/notification controls */
 #toolbar {
   display: flex;
