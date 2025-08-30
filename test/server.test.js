@@ -107,6 +107,49 @@ test('POST upload handles multibyte filenames', async () => {
   controller.abort();
 });
 
+test('POST upload handles large payloads', async () => {
+  const base = `http://localhost:${port}`;
+  const bigData = Buffer.alloc(1024 * 1024, 1).toString('base64');
+  const resp = await fetch(`${base}/upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      room: 'bigupload',
+      password: 'pass',
+      name: 'Bob',
+      fileName: 'big.bin',
+      mimeType: 'application/octet-stream',
+      data: bigData,
+    }),
+  });
+  assert.equal(resp.status, 200);
+
+  const controller = new AbortController();
+  const res = await fetch(`${base}/events?room=bigupload&password=pass`, {
+    signal: controller.signal,
+  });
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  while (!buf.includes('big.bin')) {
+    const { done, value } = await reader.read();
+    assert.ok(!done, 'stream ended before file message');
+    buf += dec.decode(value);
+  }
+  assert.match(buf, /"fileName":"big.bin"/);
+  controller.abort();
+});
+
+test('invalid JSON upload returns error', async () => {
+  const base = `http://localhost:${port}`;
+  const resp = await fetch(`${base}/upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{bad json',
+  });
+  assert.equal(resp.status, 400);
+});
+
 test('SSE streams history and logout broadcasts removal', async () => {
   const base = `http://localhost:${port}`;
   // Preload history then connect to SSE and verify it is delivered

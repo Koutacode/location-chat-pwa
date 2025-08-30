@@ -539,26 +539,11 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
-          let ok = resp && resp.ok;
-          if (!ok) {
-            const urlGet = `/upload?room=${encodeURIComponent(roomName)}&password=${encodeURIComponent(roomPass)}&name=${encodeURIComponent(userName)}&fileName=${encodeURIComponent(file.name)}&mimeType=${encodeURIComponent(mimeType)}&data=${encodeURIComponent(base64)}`;
-            const resp2 = await fetch(urlGet, { method: 'GET' });
-            ok = resp2 && resp2.ok;
-          }
-          if (!ok) {
+          if (!resp || !resp.ok) {
             alert('ファイル送信に失敗しました');
           }
         } catch (err) {
-          // If POST request fails entirely (network error), try GET as fallback
-          try {
-            const urlGet = `/upload?room=${encodeURIComponent(roomName)}&password=${encodeURIComponent(roomPass)}&name=${encodeURIComponent(userName)}&fileName=${encodeURIComponent(file.name)}&mimeType=${encodeURIComponent(mimeType)}&data=${encodeURIComponent(base64)}`;
-            const resp2 = await fetch(urlGet, { method: 'GET' });
-            if (!resp2 || !resp2.ok) {
-              alert('ファイル送信に失敗しました');
-            }
-          } catch (err2) {
-            alert('ファイル送信に失敗しました');
-          }
+          alert('ファイル送信に失敗しました');
         }
         // Reset file input so the same file can be chosen again
         fileInput.value = '';

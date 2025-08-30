@@ -123,16 +123,17 @@ function serveStatic(filePath, res) {
  * @param {number} [limit=15*1024*1024] Maximum bytes allowed
  * @returns {Promise<Object>} Parsed JSON object (empty object on failure)
  */
+// Read and parse JSON request body. Rejects on errors or payloads that exceed
+// the given limit so callers can surface meaningful HTTP status codes.
 function readJson(req, limit = 15 * 1024 * 1024) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const chunks = [];
     let total = 0;
     req.on('data', (chunk) => {
       total += chunk.length;
       if (total > limit) {
-        // Abort the connection if payload is too large
         req.destroy();
-        resolve({});
+        reject(new Error('Payload too large'));
         return;
       }
       chunks.push(chunk);
@@ -142,11 +143,10 @@ function readJson(req, limit = 15 * 1024 * 1024) {
         const body = Buffer.concat(chunks).toString('utf8');
         resolve(JSON.parse(body || '{}'));
       } catch (err) {
-        // Malformed JSON – return empty object
-        resolve({});
+        reject(err);
       }
     });
-    req.on('error', () => resolve({}));
+    req.on('error', reject);
   });
 }
 
@@ -200,69 +200,89 @@ const server = http.createServer((req, res) => {
 
   // Endpoint to post new chat messages (POST)
   if (pathname === '/message' && req.method === 'POST') {
-    (async () => {
-      const { name, text, room, password } = await readJson(req);
-      const roomName = room || 'default';
-      const roomObj = getOrCreateRoom(roomName, password || '');
-      if (!roomObj) {
-        res.writeHead(403);
-        res.end('Invalid room password');
-        return;
-      }
-      if (name && text) {
-        const msg = { name, text, time: Date.now() };
-        roomObj.messages.push(msg);
-        if (roomObj.messages.length > 200) roomObj.messages.shift();
-        broadcast(roomName, 'message', msg);
-      }
-      res.writeHead(200);
-      res.end('ok');
-    })();
+    readJson(req)
+      .then(({ name, text, room, password }) => {
+        const roomName = room || 'default';
+        const roomObj = getOrCreateRoom(roomName, password || '');
+        if (!roomObj) {
+          res.writeHead(403);
+          res.end('Invalid room password');
+          return;
+        }
+        if (name && text) {
+          const msg = { name, text, time: Date.now() };
+          roomObj.messages.push(msg);
+          if (roomObj.messages.length > 200) roomObj.messages.shift();
+          broadcast(roomName, 'message', msg);
+        }
+        res.writeHead(200);
+        res.end('ok');
+      })
+      .catch(() => {
+        res.writeHead(400);
+        res.end('Invalid JSON');
+      });
     return;
   }
 
   // Endpoint to post location updates (POST)
   if (pathname === '/location' && req.method === 'POST') {
-    (async () => {
-      const { name, lat, lon, room, password } = await readJson(req);
-      const roomName = room || 'default';
-      const roomObj = getOrCreateRoom(roomName, password || '');
-      if (!roomObj) {
-        res.writeHead(403);
-        res.end('Invalid room password');
-        return;
-      }
-      if (name && typeof lat === 'number' && typeof lon === 'number') {
-        const loc = { name, lat, lon, time: Date.now() };
-        roomObj.locations[name] = loc;
-        broadcast(roomName, 'location', loc);
-      }
-      res.writeHead(200);
-      res.end('ok');
-    })();
+    readJson(req)
+      .then(({ name, lat, lon, room, password }) => {
+        const roomName = room || 'default';
+        const roomObj = getOrCreateRoom(roomName, password || '');
+        if (!roomObj) {
+          res.writeHead(403);
+          res.end('Invalid room password');
+          return;
+        }
+        if (name && typeof lat === 'number' && typeof lon === 'number') {
+          const loc = { name, lat, lon, time: Date.now() };
+          roomObj.locations[name] = loc;
+          broadcast(roomName, 'location', loc);
+        }
+        res.writeHead(200);
+        res.end('ok');
+      })
+      .catch(() => {
+        res.writeHead(400);
+        res.end('Invalid JSON');
+      });
     return;
   }
 
   // Endpoint to upload file attachments (POST)
   if (pathname === '/upload' && req.method === 'POST') {
-    (async () => {
-      const { name, room, password, fileName, mimeType, data } = await readJson(req);
-      const roomName = room || 'default';
-      const roomObj = getOrCreateRoom(roomName, password || '');
-      if (!roomObj) {
-        res.writeHead(403);
-        res.end('Invalid room password');
-        return;
-      }
-      if (name && fileName && data) {
+    readJson(req)
+      .then(({ name, room, password, fileName, mimeType, data }) => {
+        const roomName = room || 'default';
+        const roomObj = getOrCreateRoom(roomName, password || '');
+        if (!roomObj) {
+          res.writeHead(403);
+          res.end('Invalid room password');
+          return;
+        }
+        if (!(name && fileName && data)) {
+          res.writeHead(400);
+          res.end('Missing fields');
+          return;
+        }
         const msg = { name, fileName, mimeType: mimeType || '', data, time: Date.now() };
         roomObj.messages.push(msg);
         if (roomObj.messages.length > 200) roomObj.messages.shift();
         broadcast(roomName, 'message', msg);
-      }
-      res.writeHead(200);
-      res.end('ok');
-    })();
+        res.writeHead(200);
+        res.end('ok');
+      })
+      .catch((err) => {
+        if (err.message === 'Payload too large') {
+          res.writeHead(413);
+          res.end('Payload too large');
+        } else {
+          res.writeHead(400);
+          res.end('Invalid JSON');
+        }
+      });
     return;
   }
 
