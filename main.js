@@ -1,215 +1,140 @@
-// Client‑side script for the Location Chat PWA
-
 (() => {
-  // Global error handler: show a popup if any uncaught error occurs. This helps
-  // surface issues in production deployments where a silent error might
-  // prevent the UI from working as expected. Note: alerts are intrusive but
-  // useful for debugging. Remove or disable in final production builds.
-  window.addEventListener('error', (event) => {
-    try {
-      alert('Client error: ' + event.message);
-    } catch (_) {
-      // ignore if alert fails
-    }
-  });
-  // Helper: format timestamp into readable HH:MM
-  function formatTime(ts) {
-    const date = new Date(ts);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-
-  // User/session state variables. These are set when the user logs in via the
-  // overlay. Until then, the chat and location features are disabled.
+  // ====== 状態 ======
   let userName = '';
   let roomName = '';
   let roomPass = '';
   let eventSource = null;
   let watchId = null;
 
-  // DOM elements
-  const messagesEl = document.getElementById('messages');
-  const inputEl = document.getElementById('message-input');
-  const sendBtn = document.getElementById('send-btn');
-  const shareBtn = document.getElementById('share-btn');
-  const inviteBtn = document.getElementById('invite-btn');
-  const connectionStatusEl = document.getElementById('connection-status');
-  const notifyToggle = document.getElementById('notify-toggle');
-  const rememberLoginCheckbox = document.getElementById('remember-login');
+  // SSE再接続用バックオフ設定
+  let reconnectDelay = 1000;
+  let reconnectTimeoutId = null;
+  let notificationsEnabled = false;
 
-  // Login overlay and inputs
-  const loginOverlay = document.getElementById('login-overlay');
+  // Leaflet のマップと参加者位置マーカー管理
+  let map = null;
+  const markers = {};
+  let hasCentered = false; // 自分の初回位置更新で一度だけセンタリング
+
+  // ====== DOM要素 ======
+  const messagesEl         = document.getElementById('messages');
+  const inputEl            = document.getElementById('message-input');
+  const sendBtn            = document.getElementById('send-btn');
+  const shareBtn           = document.getElementById('share-btn');
+  const inviteBtn          = document.getElementById('invite-btn');
+  const connectionStatusEl = document.getElementById('connection-status');
+  const notifyToggle       = document.getElementById('notify-toggle');
+  const rememberLoginCheckbox = document.getElementById('remember-login');
+  const userListEl         = document.getElementById('user-list');  // 参加者一覧
+
+  // ログイン用オーバーレイUI
+  const loginOverlay   = document.getElementById('login-overlay');
   const loginNameInput = document.getElementById('login-name');
   const loginRoomInput = document.getElementById('login-room');
   const loginPassInput = document.getElementById('login-pass');
-  const loginBtn = document.getElementById('login-btn');
-  const deleteRoomBtn = document.getElementById('delete-room-btn');
-  const logoutBtn = document.getElementById('logout-btn');
-  // Dropdown of existing rooms and room display
-  const roomsSelect = document.getElementById('rooms-select');
-  const roomDisplay = document.getElementById('room-display');
+  const loginBtn       = document.getElementById('login-btn');
+  const deleteRoomBtn  = document.getElementById('delete-room-btn');
+  const logoutBtn      = document.getElementById('logout-btn');
 
-  // Connection retry delay (exponential backoff) for SSE
-  let reconnectDelay = 1000; // start with 1 second
-  const maxReconnectDelay = 30000; // cap at 30 seconds
-  let reconnectTimeoutId = null;
+  // ルーム選択ドロップダウン・表示
+  const roomsSelect    = document.getElementById('rooms-select');
+  const roomDisplay    = document.getElementById('room-display');
 
-  // Whether to show notifications for incoming messages
-  let notificationsEnabled = false;
+  // ====== ユーティリティ ======
 
-      // Initialize map using Leaflet if available. Some deployment
-      // environments may block external scripts (like Leaflet from unpkg),
-      // which would leave `L` undefined. Guard against this so the rest of
-      // the app (chat and location sharing) can still function without
-      // throwing errors. When Leaflet is unavailable, the map element
-      // remains blank and markers are ignored.
-      let map = null;
-      try {
-        if (typeof L !== 'undefined') {
-          map = L.map('map').setView([35.0, 135.0], 3); // Default to Japan
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors',
-          }).addTo(map);
-        } else {
-          console.warn('Leaflet library is not loaded; map disabled');
-        }
-      } catch (err) {
-        console.error('Failed to initialize map:', err);
-        map = null;
-      }
-
-  // Store markers keyed by user name
-  const markers = {};
-
-  /**
-   * Clean up the current session: stop SSE, stop geolocation, clear markers and
-   * messages, and reset UI to the login overlay. This is used when the user
-   * logs out.
-   */
-  function resetSession() {
-    // Stop SSE
-    if (eventSource) {
-      eventSource.close();
-      eventSource = null;
-    }
-    // Cancel pending reconnect attempts
-    if (reconnectTimeoutId) {
-      clearTimeout(reconnectTimeoutId);
-      reconnectTimeoutId = null;
-    }
-    // Stop geolocation watch
-    if (watchId != null) {
-      navigator.geolocation.clearWatch(watchId);
-      watchId = null;
-      // Reset share button state
-      shareBtn.disabled = false;
-      shareBtn.textContent = '位置共有開始';
-    }
-    // Remove our own marker from the map
-    if (markers[userName]) {
-      if (map && map.removeLayer) {
-        map.removeLayer(markers[userName]);
-      }
-      delete markers[userName];
-    }
-    // Clear chat messages
-    messagesEl.innerHTML = '';
-    // Reset state variables
-    userName = '';
-    roomName = '';
-    roomPass = '';
-    // Show login overlay and hide logout button
-    loginOverlay.style.display = 'flex';
-    logoutBtn.style.display = 'none';
-    // Clear the current room display when logged out
-    if (roomDisplay) {
-      roomDisplay.textContent = '';
-    }
-    // Reset connection status indicator
-    if (connectionStatusEl) {
-      connectionStatusEl.textContent = '未接続';
-    }
+  /** 日付オブジェクトを時刻文字列に */
+  function formatTime(ts) {
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
-  /**
-   * Add or update a marker on the map for a user.
-   *
-   * @param {string} name User name
-   * @param {number} lat Latitude
-   * @param {number} lon Longitude
-   */
-      function updateMarker(name, lat, lon) {
-        // Only attempt to update markers if a map is available
-        if (!map) return;
-        if (markers[name]) {
-          markers[name].setLatLng([lat, lon]);
-        } else {
-          // Guard against L being undefined
-          if (typeof L !== 'undefined') {
-            const marker = L.marker([lat, lon]).addTo(map);
-            marker.bindPopup(name);
-            markers[name] = marker;
-          }
-    // If this update is for our current user, re-center the map only once
-    if (name === userName) {
-      const currentZoom = map.getZoom();
-      const desiredZoom = currentZoom < 12 ? 12 : currentZoom;
-      if (!updateMarker.hasCentered) {
-        map.setView([lat, lon], desiredZoom);
-        updateMarker.hasCentered = true;
-      }
-    }
-   
-   * Append a message to the chat area.
-   *
-   * @param {Object} msg Message object with name, text, time
-   */
+  /** メッセージを DOM に追加表示 */
   function appendMessage(msg) {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'message';
+    const wrap  = document.createElement('div');
+    wrap.className = 'message';
+
     const nameSpan = document.createElement('span');
     nameSpan.className = 'name';
     nameSpan.textContent = msg.name;
+
     const timeSpan = document.createElement('span');
     timeSpan.className = 'time';
     timeSpan.textContent = formatTime(msg.time);
-    wrapper.appendChild(nameSpan);
-    wrapper.appendChild(timeSpan);
+
+    wrap.appendChild(nameSpan);
+    wrap.appendChild(timeSpan);
+
     if (msg.text) {
       const textSpan = document.createElement('span');
       textSpan.className = 'text';
       textSpan.textContent = ' ' + msg.text;
-      wrapper.appendChild(textSpan);
+      wrap.appendChild(textSpan);
     }
-    messagesEl.appendChild(wrapper);
-    // Scroll to bottom
+
+    messagesEl.appendChild(wrap);
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
-  /**
-   * Send a chat message to the server.
-   */
+  /** 参加者一覧の表示を更新 */
+  function updateUserList() {
+    if (!userListEl) return;
+    const names = Object.keys(markers).sort((a,b) => a.localeCompare(b,'ja'));
+    userListEl.innerHTML = '';
+    for (const n of names) {
+      const pill = document.createElement('div');
+      pill.className = 'user-list-item';
+      pill.textContent = n;
+      userListEl.appendChild(pill);
+    }
+  }
+
+  /** マーカーを更新、初回のみ自動センタリング */
+  function updateMarker(name, lat, lon) {
+    if (!map) return;
+    if (markers[name]) {
+      markers[name].setLatLng([lat, lon]);
+    } else {
+      if (typeof L !== 'undefined') {
+        const marker = L.marker([lat, lon]).addTo(map);
+        marker.bindPopup(name);
+        markers[name] = marker;
+      }
+    }
+    // 自分のマーカー更新時は最初の1回のみセンタリング
+    if (name === userName && !hasCentered) {
+      const currentZoom = map.getZoom();
+      const desiredZoom = currentZoom < 12 ? 12 : currentZoom;
+      map.setView([lat, lon], desiredZoom);
+      hasCentered = true;
+    }
+    updateUserList();
+  }
+
+  /** メッセージ送信 */
   function sendMessage() {
     if (!userName || !roomName) return;
-    const textVal = inputEl.value.trim();
-    if (!textVal) return;
-    const url = `/message?room=${encodeURIComponent(roomName)}&password=${encodeURIComponent(roomPass)}&name=${encodeURIComponent(userName)}&text=${encodeURIComponent(textVal)}`;
+    const txt = inputEl.value.trim();
+    if (!txt) return;
+
+    const url = `/message?room=${encodeURIComponent(roomName)}&password=${encodeURIComponent(roomPass)}&name=${encodeURIComponent(userName)}&text=${encodeURIComponent(txt)}`;
     fetch(url, { method: 'GET' });
     inputEl.value = '';
   }
 
-  // Event listeners for sending messages
-  sendBtn.addEventListener('click', sendMessage);
-  inputEl.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      sendMessage();
-    }
-  });
+  // 送信イベントの二重送信防止・IME確定中ガード
+  let lastSendAt = 0;
+  function safeSend() {
+    const now = Date.now();
+    if (now - lastSendAt < 350) return;
+    lastSendAt = now;
+    sendMessage();
+  }
 
-  // Request geolocation and continuously send updates
+  /** 位置情報共有を開始 */
   function startSharing() {
     if (!userName || !roomName) return;
     if (!navigator.geolocation) {
-      alert('このブラウザでは位置情報がサポートされていません');
+      alert('このブラウザは位置情報に対応していません');
       return;
     }
     shareBtn.disabled = true;
@@ -217,126 +142,143 @@
     watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        const urlLoc = `/location?room=${encodeURIComponent(roomName)}&password=${encodeURIComponent(roomPass)}&name=${encodeURIComponent(userName)}&lat=${latitude}&lon=${longitude}`;
-        fetch(urlLoc, { method: 'GET' });
+        const url = `/location?room=${encodeURIComponent(roomName)}&password=${encodeURIComponent(roomPass)}&name=${encodeURIComponent(userName)}&lat=${latitude}&lon=${longitude}`;
+        fetch(url, { method: 'GET' });
       },
-      (err) => {
-        console.error(err);
-      },
+      () => {},
       { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
     );
   }
-  shareBtn.addEventListener('click', startSharing);
 
-  /**
-   * Start the SSE connection for the current room and password. Handles
-   * receiving chat messages and location updates.
-   */
+  /** SSEを開始 */
   function startSSE() {
     if (!roomName) return;
-    // Close any existing connection
-    if (eventSource) {
-      eventSource.close();
-      eventSource = null;
-    }
-    // Cancel any pending reconnect
+
+    // 既存接続を閉じて再接続処理を初期化
+    if (eventSource) { eventSource.close(); eventSource = null; }
     if (reconnectTimeoutId) {
       clearTimeout(reconnectTimeoutId);
       reconnectTimeoutId = null;
     }
+
     const url = `/events?room=${encodeURIComponent(roomName)}&password=${encodeURIComponent(roomPass)}`;
-    // Inner function to establish connection with reconnection logic
-    const connect = () => {
-      // Ensure we still have a room and not logged out
+
+    function connect() {
       if (!roomName) return;
-      // Open SSE
+
       try {
         eventSource = new EventSource(url);
       } catch (err) {
-        console.error('Failed to create EventSource', err);
         scheduleReconnect();
         return;
       }
-      // On open
+
       eventSource.onopen = () => {
-        console.log('SSE connection established');
-        // Reset reconnect delay on success
         reconnectDelay = 1000;
         if (connectionStatusEl) connectionStatusEl.textContent = '接続中';
       };
-      // Generic error handler
-      eventSource.onerror = (err) => {
-        console.error('SSE error', err);
+
+      eventSource.onerror = () => {
         if (connectionStatusEl) connectionStatusEl.textContent = '再接続中…';
-        // Close connection before reconnecting
         if (eventSource) {
           eventSource.close();
           eventSource = null;
         }
         scheduleReconnect();
       };
-      // Receive chat messages
+
+      // メッセージ受信
       eventSource.addEventListener('message', (e) => {
         try {
           const msg = JSON.parse(e.data);
           appendMessage(msg);
-          // Show notification if enabled
+          // 通知を表示
           if (notificationsEnabled && Notification.permission === 'granted') {
-            // Only notify when the page is not visible to reduce noise
             if (document.hidden || !document.hasFocus()) {
               try {
                 new Notification(`${msg.name} (${formatTime(msg.time)})`, { body: msg.text });
-              } catch (_) {
-                // Ignore if notification fails
-              }
+              } catch {}
             }
           }
-        } catch (err) {
-          console.error('Failed to parse message event', err);
-        }
+        } catch {}
       });
-      // Receive location updates
+
+      // 位置更新受信
       eventSource.addEventListener('location', (e) => {
         try {
           const loc = JSON.parse(e.data);
           updateMarker(loc.name, loc.lat, loc.lon);
-        } catch (err) {
-          console.error('Failed to parse location event', err);
-        }
+          updateUserList(); // 念のため
+        } catch {}
       });
-      // Receive remove events for markers
+
+      // 参加者が離脱
       eventSource.addEventListener('remove', (e) => {
         try {
           const data = JSON.parse(e.data);
           const name = data.name;
           if (markers[name]) {
-            if (map && map.removeLayer) {
-              map.removeLayer(markers[name]);
-            }
+            if (map && map.removeLayer) map.removeLayer(markers[name]);
             delete markers[name];
+            updateUserList();
           }
-        } catch (err) {
-          console.error('Failed to parse remove event', err);
-        }
+        } catch {}
       });
-    };
-    // Schedule a reconnect with exponential backoff
+    }
+
     function scheduleReconnect() {
       if (reconnectTimeoutId) return;
       reconnectTimeoutId = setTimeout(() => {
         reconnectTimeoutId = null;
-        reconnectDelay = Math.min(reconnectDelay * 2, maxReconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 30000);
         connect();
       }, reconnectDelay);
     }
-    // Initiate first connection
+
     connect();
   }
 
-  // Handle login button: collect credentials and start session. Before
-  // proceeding, validate the password for existing rooms via the
-  // /checkRoom endpoint. If the password is wrong, display an error and
-  // do not proceed.
+  /** セッションのリセット（ログアウト等に使用） */
+  function resetSession() {
+    // SSEを停止
+    if (eventSource) { eventSource.close(); eventSource = null; }
+    // 再接続タイマーをクリア
+    if (reconnectTimeoutId) {
+      clearTimeout(reconnectTimeoutId);
+      reconnectTimeoutId = null;
+    }
+    // 位置共有停止
+    if (watchId != null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      shareBtn.disabled = false;
+      shareBtn.textContent = '位置共有開始';
+    }
+    // 自分のマーカーを削除
+    if (markers[userName]) {
+      if (map && map.removeLayer) map.removeLayer(markers[userName]);
+      delete markers[userName];
+    }
+    // チャット欄をクリア
+    messagesEl.innerHTML = '';
+    // 状態変数をクリア
+    userName = '';
+    roomName = '';
+    roomPass = '';
+    // ログインUIを表示、ログアウトボタンを非表示
+    loginOverlay.style.display = 'flex';
+    logoutBtn.style.display = 'none';
+    // ルーム表示をクリア
+    if (roomDisplay) roomDisplay.textContent = '';
+    // 接続ステータスを更新
+    if (connectionStatusEl) connectionStatusEl.textContent = '未接続';
+    // 参加者リストをクリア・センタリングフラグをリセット
+    if (userListEl) userListEl.innerHTML = '';
+    hasCentered = false;
+  }
+
+  // ====== ログイン・ログアウト ======
+
   loginBtn.addEventListener('click', async () => {
     const nameVal = loginNameInput.value.trim();
     const roomVal = loginRoomInput.value.trim();
@@ -345,108 +287,67 @@
       alert('名前とルーム名を入力してください');
       return;
     }
-    try {
-      // Verify password for existing rooms. If the room does not exist
-      // yet, the server returns 404 and we treat it as a new room. If the
-      // password is incorrect, the server returns 403 and we abort.
-      const respCheck = await fetch(
-        `/checkRoom?room=${encodeURIComponent(roomVal)}&password=${encodeURIComponent(passVal)}`,
-        { method: 'GET' }
-      );
-      if (respCheck.status === 403) {
-        alert('パスワードが間違っています');
-        return;
-      }
-      // If status is 404 (room does not exist) or 200 (password matches),
-      // proceed to join/create the room.
-    } catch (err) {
-      // Network or other errors shouldn't block room creation. Log and continue.
-      console.error('パスワード確認中にエラーが発生しました', err);
-    }
     userName = nameVal;
     roomName = roomVal;
     roomPass = passVal || '';
-    // Hide login overlay and show logout button
+
     loginOverlay.style.display = 'none';
     logoutBtn.style.display = 'block';
-    // Show the current room name in the header when logged in
-    if (roomDisplay) {
-      roomDisplay.textContent = 'ルーム: ' + roomName;
-    }
-    // Save login details based on remember checkbox
+    if (roomDisplay) roomDisplay.textContent = 'ルーム: ' + roomName;
+
     saveLogin();
-    // Start SSE for this room
     startSSE();
   });
 
-  // Handle delete room button: attempts to remove a room (must match password)
-  deleteRoomBtn.addEventListener('click', async () => {
-    const roomVal = loginRoomInput.value.trim();
-    const passVal = loginPassInput.value;
-    if (!roomVal) {
-      alert('削除するルーム名を入力してください');
-      return;
-    }
-    try {
-      const resp = await fetch(`/deleteRoom?room=${encodeURIComponent(roomVal)}&password=${encodeURIComponent(passVal)}`, { method: 'GET' });
-      const text = await resp.text();
-      if (resp.ok) {
-        alert('ルームを削除しました');
-        // Optionally clear inputs
-        loginRoomInput.value = '';
-        loginPassInput.value = '';
-        // Refresh the rooms list after deletion
-        fetchRooms();
-      } else {
-        alert('削除に失敗: ' + text);
-      }
-    } catch (err) {
-      alert('削除リクエストに失敗しました');
-    }
-  });
-
-  // Handle logout button: clear session and notify server to remove location
   logoutBtn.addEventListener('click', () => {
     if (roomName && userName) {
-      // Notify server to remove our location from the room
       fetch(`/logout?room=${encodeURIComponent(roomName)}&password=${encodeURIComponent(roomPass)}&name=${encodeURIComponent(userName)}`, { method: 'GET' });
     }
     resetSession();
-    // Refresh the rooms list after logging out (new rooms may have been created)
-    fetchRooms();
   });
 
-  // Handle invite button: generate a shareable link for this room
-  if (inviteBtn) {
-    inviteBtn.addEventListener('click', async () => {
-      if (!roomName) {
-        alert('ルームに入室してから招待リンクを生成してください');
+  // 招待リンク生成ボタン
+  inviteBtn.addEventListener('click', async () => {
+    if (!roomName) {
+      alert('ルームに入室してから招待リンクを生成してください');
+      return;
+    }
+    try {
+      const resp = await fetch(`/invite/create?room=${encodeURIComponent(roomName)}&password=${encodeURIComponent(roomPass)}`, { method: 'GET' });
+      if (!resp.ok) {
+        alert('招待リンク生成に失敗しました');
         return;
       }
+      const data = await resp.json();
+      const link = `${window.location.origin}${data.link}`;
       try {
-        const resp = await fetch(`/invite/create?room=${encodeURIComponent(roomName)}&password=${encodeURIComponent(roomPass)}`, { method: 'GET' });
-        if (!resp.ok) {
-          const txt = await resp.text();
-          alert('招待リンク生成に失敗しました: ' + txt);
-          return;
-        }
-        const data = await resp.json();
-        const link = `${window.location.origin}${data.link}`;
-        // Copy to clipboard if possible
-        try {
-          await navigator.clipboard.writeText(link);
-          alert(`招待リンクをコピーしました:\n${link}`);
-        } catch (err) {
-          // Fallback: show prompt with link
-          prompt('招待リンク (コピーして共有してください)', link);
-        }
-      } catch (err) {
-        alert('招待リンク生成中にエラーが発生しました');
+        await navigator.clipboard.writeText(link);
+        alert(`招待リンクをコピーしました:\n${link}`);
+      } catch {
+        prompt('招待リンク（コピーして共有してください）', link);
       }
-    });
-  }
+    } catch {
+      alert('招待リンク生成中にエラーが発生しました');
+    }
+  });
 
-  // Handle notification toggle: request permission and update flag
+  // 送信ボタンとキーイベント
+  sendBtn.addEventListener('click', safeSend);
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
+      e.preventDefault();
+      safeSend();
+    }
+  });
+  inputEl.addEventListener('focus', () => {
+    setTimeout(() => {
+      try {
+        inputEl.scrollIntoView({ block: 'center' });
+      } catch {}
+    }, 250);
+  });
+
+  // 通知トグル
   if (notifyToggle) {
     notifyToggle.addEventListener('change', async () => {
       if (notifyToggle.checked) {
@@ -454,18 +355,13 @@
           notificationsEnabled = true;
         } else if (Notification.permission !== 'denied') {
           try {
-            const perm = await Notification.requestPermission();
-            notificationsEnabled = perm === 'granted';
-            if (!notificationsEnabled) {
-              notifyToggle.checked = false;
-            }
-          } catch (err) {
+            notificationsEnabled = (await Notification.requestPermission()) === 'granted';
+          } catch {
             notificationsEnabled = false;
-            notifyToggle.checked = false;
           }
+          if (!notificationsEnabled) notifyToggle.checked = false;
         } else {
-          // Permission denied previously
-          alert('通知の権限が許可されていません。ブラウザの設定から許可してください。');
+          alert('ブラウザの設定で通知がブロックされています');
           notificationsEnabled = false;
           notifyToggle.checked = false;
         }
@@ -475,30 +371,46 @@
     });
   }
 
-  /**
-   * Save login details to localStorage if the remember checkbox is checked.
-   */
+  // ルーム選択ドロップダウン
+  if (roomsSelect) {
+    roomsSelect.addEventListener('change', () => {
+      const val = roomsSelect.value;
+      if (val) loginRoomInput.value = val;
+    });
+  }
+
+  // 既存ルーム一覧取得
+  async function fetchRooms() {
+    if (!roomsSelect) return;
+    try {
+      const resp = await fetch('/rooms');
+      if (!resp.ok) return;
+      const list = await resp.json();
+      while (roomsSelect.options.length > 1) roomsSelect.remove(1);
+      list.forEach((room) => {
+        const opt = document.createElement('option');
+        opt.value = room;
+        opt.textContent = room;
+        roomsSelect.appendChild(opt);
+      });
+    } catch {}
+  }
+
+  // 入室情報保存
   function saveLogin() {
     if (!rememberLoginCheckbox) return;
     if (rememberLoginCheckbox.checked) {
-      const data = { name: userName, room: roomName, pass: roomPass };
       try {
-        localStorage.setItem('kotachat-login', JSON.stringify(data));
-      } catch (err) {
-        console.warn('Could not save login info', err);
-      }
+        localStorage.setItem('kotachat-login', JSON.stringify({ name: userName, room: roomName, pass: roomPass }));
+      } catch {}
     } else {
       try {
         localStorage.removeItem('kotachat-login');
-      } catch (err) {
-        // ignore
-      }
+      } catch {}
     }
   }
 
-  /**
-   * Load saved login details from localStorage and populate the form fields.
-   */
+  // 保存済み入室情報読み込み
   function loadSavedLogin() {
     if (!rememberLoginCheckbox) return;
     try {
@@ -510,14 +422,10 @@
         if (data.pass) loginPassInput.value = data.pass;
         rememberLoginCheckbox.checked = true;
       }
-    } catch (err) {
-      console.warn('Could not load saved login info', err);
-    }
+    } catch {}
   }
 
-  /**
-   * If a token is provided in the URL (invite), redeem it to prefill room/pass.
-   */
+  // 招待トークン付きURLを処理
   async function checkInviteToken() {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
@@ -525,93 +433,40 @@
     try {
       const resp = await fetch(`/invite/join?token=${encodeURIComponent(token)}`);
       if (!resp.ok) {
-        const txt = await resp.text();
-        alert('招待リンクが無効です: ' + txt);
+        alert('招待リンクが無効または期限切れです');
         return;
       }
       const data = await resp.json();
       if (data.room) loginRoomInput.value = data.room;
       if (data.password) loginPassInput.value = data.password;
-      // Move to end: highlight fields
       if (rememberLoginCheckbox) rememberLoginCheckbox.checked = false;
-      alert('招待リンクが適用されました。ニックネームを入力して入室してください');
-    } catch (err) {
-      alert('招待リンクの処理中にエラーが発生しました');
+      alert('招待リンクを適用しました。ニックネームを入力して入室してください。');
+    } catch {
+      alert('招待リンクの適用に失敗しました');
     }
   }
 
-
-  // Register service worker for PWA functionality.
-  // To ensure that users always receive the latest assets, first unregister any
-  // existing service workers before registering the current one. Without this
-  // step, older service workers may continue to serve stale cached files,
-  // causing the UI to appear outdated.
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      // Load saved login details before populating rooms
-      loadSavedLogin();
-      // Check if a token is present in the URL (invite) and prefill room/password
-      checkInviteToken().finally(() => {
-        // Populate the list of available rooms on initial load
-        fetchRooms();
-      });
-      navigator.serviceWorker
-        .getRegistrations()
-        .then((regs) => {
-          return Promise.all(
-            regs.map((reg) => {
-              return reg.unregister();
-            }),
-          );
-        })
-        .catch(() => {
-          // Ignore errors during unregister; likely no service workers yet
-        })
-        .finally(() => {
-          navigator.serviceWorker
-            .register('/service-worker.js', { updateViaCache: 'none' })
-            .then(() => {
-              console.log('Service worker registered (updated)');
-            })
-            .catch((err) => {
-              console.error('Service worker registration failed', err);
-            });
-        });
-    });
-  }
-
-  /**
-   * Fetch the list of available rooms from the server and populate the
-   * dropdown. The first option remains a placeholder and is not removed.
-   */
-  async function fetchRooms() {
-    if (!roomsSelect) return;
+  // ====== 起動時処理 ======
+  window.addEventListener('load', async () => {
+    // Leaflet初期化
     try {
-      const resp = await fetch('/rooms');
-      if (!resp.ok) return;
-      const list = await resp.json();
-      // Remove existing options except the first placeholder
-      while (roomsSelect.options.length > 1) {
-        roomsSelect.remove(1);
+      if (typeof L !== 'undefined') {
+        map = L.map('map').setView([35.0, 135.0], 3);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+        }).addTo(map);
+      } else {
+        console.warn('Leafletが読み込まれていないため地図機能は無効です');
       }
-      list.forEach((room) => {
-        const opt = document.createElement('option');
-        opt.value = room;
-        opt.textContent = room;
-        roomsSelect.appendChild(opt);
-      });
     } catch (err) {
-      console.error('Failed to fetch rooms', err);
+      console.error('Leafletの初期化に失敗しました:', err);
+      map = null;
     }
-  }
+    loadSavedLogin();
+    await checkInviteToken();
+    await fetchRooms();
+  });
 
-  // When a room is selected from the dropdown, update the room input
-  if (roomsSelect) {
-    roomsSelect.addEventListener('change', () => {
-      const val = roomsSelect.value;
-      if (val) {
-        loginRoomInput.value = val;
-      }
-    });
-  }
+  // 位置共有ボタン
+  shareBtn.addEventListener('click', startSharing);
 })();

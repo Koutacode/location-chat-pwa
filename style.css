@@ -1,270 +1,157 @@
-/* Basic styling for the location chat PWA */
-* {
-  box-sizing: border-box;
-}
-
-/* Prevent pull-to-refresh/overscroll on the root element in mobile browsers.
-   This setting ensures that scrolling to the top does not cause the page to
-   refresh back to the login screen. */
-html {
-  overscroll-behavior: none;
-}
-
-body {
+/* 基本設定 */
+html, body {
+  height: 100%;
   margin: 0;
-  font-family: sans-serif;
-  height: 100vh;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+
+/* ヘッダ */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+}
+
+.header-right > * {
+  margin-left: 8px;
+}
+
+/* マップ＋チャットのレイアウト */
+.app {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  grid-template-rows: 1fr;
+  height: calc(100% - 50px);
+}
+
+.map {
+  background: #eaeaea;
+}
+
+.chat {
   display: flex;
   flex-direction: column;
-  /* Prevent pull-to-refresh/overscroll on mobile. Setting overscroll-behavior
-     to none stops the browser from triggering a page refresh when the user
-     scrolls past the top of the page on touch devices. */
-  overscroll-behavior: none;
-}
-
-header {
-  background-color: #2196f3;
-  color: #fff;
-  padding: 12px;
-  text-align: center;
-}
-
-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-#map {
-  flex: 1;
-  min-height: 40vh;
-}
-
-#chat {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  border-top: 1px solid #ddd;
-  /* Ensure the chat panel sits above the map and provides a positioning
-     context for sticky children such as the input area. */
+  border-left: 1px solid #ddd;
   position: relative;
   z-index: 1;
+  /* Safe Area対応 */
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-#messages {
-  flex: 1;
-  overflow-y: auto;
+/* 参加者一覧 */
+.user-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   padding: 8px;
-  background-color: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+  background: #fafafa;
+  font-size: 0.9em;
+}
+
+.user-list-item {
+  padding: 4px 8px;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 12px;
+}
+
+/* メッセージ表示エリア */
+.messages {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+  background: #fff;
 }
 
 .message {
-  margin-bottom: 8px;
-  padding: 6px 8px;
-  border-radius: 4px;
-  background-color: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  margin: 6px 0;
 }
 
 .message .name {
   font-weight: bold;
-  margin-right: 4px;
+  margin-right: 6px;
 }
 
 .message .time {
-  color: #777;
-  font-size: 0.8em;
-  margin-left: 4px;
-}
-
-.message img,
-.message video {
-  max-width: 100%;
-  display: block;
-  margin-top: 4px;
-  border-radius: 4px;
-}
-
-.message a {
-  display: inline-block;
-  margin-top: 4px;
-  word-break: break-all;
-}
-
-/* Toolbar inside chat: share/invite buttons and status/notification controls */
-#toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  padding: 8px;
-  background-color: #f0f0f0;
-  border-top: 1px solid #ddd;
-}
-#connection-status {
+  color: #999;
   font-size: 0.85em;
-  color: #333;
-}
-#notify-container {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.85em;
-  color: #333;
+  margin-right: 6px;
 }
 
-/* Input area: message input and send button */
-#input-area {
+.message .text {
+  white-space: pre-wrap;
+}
+
+/* 入力エリア */
+.input-area {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
   padding: 8px;
-  background-color: #eee;
+  background: #eee;
   border-top: 1px solid #ddd;
-  /* Anchor the input area to the bottom of the chat panel so that it does
-     not overlap the map or messages when the layout changes. */
   position: sticky;
   bottom: 0;
+  /* iOS Safe Area分の余白を追加 */
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
 }
 
-#message-input {
-  flex: 1 1 auto;
-  padding: 6px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 1em;
+.input-area input {
+  flex: 1;
+  padding: 8px;
+  font-size: 14px;
 }
 
-/* Primary buttons: send and share */
-#send-btn,
-#share-btn {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 4px;
-  background-color: #2196f3;
-  color: #fff;
-  font-size: 1em;
-  cursor: pointer;
+.input-area button {
+  padding: 8px 12px;
 }
 
-/* Invite button styling */
-#invite-btn {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 4px;
-  background-color: #4caf50;
-  color: #fff;
-  font-size: 1em;
-  cursor: pointer;
-}
-#invite-btn:hover {
-  background-color: #388e3c;
-}
-
-/* Remove old status bar styles as replaced by toolbar */
-/* (empty placeholder to override any remaining status-bar definitions) */
-/* #status-bar { display: none; } */
-
-/* Remember login checkbox container styling */
-#remember-container {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  width: 80%;
-  max-width: 300px;
-}
-
-#send-btn:hover,
-#share-btn:hover {
-  background-color: #1976d2;
-}
-
-@media (min-width: 600px) {
-  main {
-    flex-direction: row;
-  }
-  #map {
-    flex: 2;
-  }
-  #chat {
-    flex: 1;
-    border-left: 1px solid #ddd;
-  }
-}
-
-/* Overlay for login form */
-#login-overlay {
+/* ログインオーバーレイ */
+.overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(255, 255, 255, 0.95);
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
+  inset: 0;
+  background: rgba(0,0,0,0.25);
+  display: none;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  gap: 10px;
 }
 
-#login-overlay input {
-  width: 80%;
-  max-width: 300px;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 1em;
+.panel {
+  width: 320px;
+  background: #fff;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
 }
 
-/* Select for choosing existing rooms */
-#rooms-select {
-  width: 80%;
-  max-width: 300px;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 1em;
-  background-color: #fff;
+.panel .row {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
 }
 
-/* Style for current room display in header */
-#room-display {
-  font-weight: normal;
+.panel label {
+  display: block;
+  margin: 6px 0;
 }
 
-#login-overlay button {
-  width: 80%;
-  max-width: 300px;
-  padding: 8px;
-  border: none;
-  border-radius: 4px;
-  font-size: 1em;
-  cursor: pointer;
-  background-color: #2196f3;
-  color: #fff;
+.panel input,
+.panel select {
+  width: 100%;
+  padding: 6px;
+  box-sizing: border-box;
 }
 
-#login-overlay button:hover {
-  background-color: #1976d2;
-}
-
-/* Logout button styling */
-#logout-btn {
-  position: fixed;
-  top: 12px;
-  right: 12px;
-  padding: 6px 12px;
-  border: none;
-  border-radius: 4px;
-  background-color: #f44336;
-  color: #fff;
+.panel .remember {
   font-size: 0.9em;
-  cursor: pointer;
-  z-index: 900;
+  color: #555;
 }
-#logout-btn:hover {
-  background-color: #d32f2f;
+
+/* Leaflet マップ領域 */
+#map {
+  height: 100%;
+  width: 100%;
 }

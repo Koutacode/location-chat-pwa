@@ -1,78 +1,66 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#2196f3" />
-  <link rel="manifest" href="manifest.json" />
-  <!-- Load Leaflet from jsdelivr instead of unpkg. The previous CDN
-       host (unpkg) is blocked in some environments, causing the map
-       to remain blank. jsdelivr provides the same files and is
-       accessible in our deployment environment. -->
-  <link
-    rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
-    crossorigin=""
-  />
+  <meta charset="utf-8" />
+  <title>Location Chat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <link rel="stylesheet" href="style.css" />
-  <title>位置情報チャットアプリ</title>
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
-  <header>
-    <!-- Main application title -->
-    <!-- Application title displayed in the top bar. The PWA name "KOTACHAT"
-         remains in the manifest for the home screen, but we avoid showing
-         it inside the app. -->
-    <h1 id="app-title">位置情報チャットアプリ</h1>
-    <!-- Display the current room name when logged in -->
-    <span id="room-display" style="margin-left: 12px; font-size: 0.9em; color: #fff;"></span>
+  <!-- ヘッダ -->
+  <header class="header">
+    <div class="header-left">
+      <span id="room-display"></span>
+    </div>
+    <div class="header-right">
+      <label><input type="checkbox" id="notify-toggle" /> 通知</label>
+      <button id="invite-btn">招待</button>
+      <button id="share-btn">位置共有開始</button>
+      <button id="logout-btn" style="display:none;">ログアウト</button>
+      <span id="connection-status">未接続</span>
+    </div>
   </header>
-  <main>
-    <div id="map"></div>
-    <section id="chat">
-      <div id="messages"></div>
-          <div id="user-list" class="user-list"></div>
-      
-      <!-- Toolbar: contains share, invite buttons, connection status and notification toggle -->
-      <div id="toolbar">
-        <button id="share-btn">位置共有開始</button>
-        <button id="invite-btn" title="招待リンクを生成">招待</button>
-        <span id="connection-status">未接続</span>
-        <label id="notify-container"><input type="checkbox" id="notify-toggle" /> 通知</label>
-      </div>
-      <!-- Input area: message input and send button -->
-      <div id="input-area">
-        <input
-          id="message-input"
-          type="text"
-          placeholder="メッセージを入力…"
-          autocomplete="off"
-        />
+
+  <!-- 本文 -->
+  <main class="app">
+    <div id="map" class="map"></div>
+    <section id="chat" class="chat">
+      <!-- 参加者一覧 -->
+      <div id="user-list" class="user-list" aria-label="参加者"></div>
+      <!-- メッセージ表示領域 -->
+      <div id="messages" class="messages"></div>
+      <!-- 入力エリア -->
+      <div class="input-area" id="input-area">
+        <input id="message-input" type="text" placeholder="メッセージを入力" />
         <button id="send-btn">送信</button>
       </div>
     </section>
   </main>
-  <!-- Login overlay for entering display name, room name and password -->
-  <div id="login-overlay">
-    <h2>ルームに入室</h2>
-    <input id="login-name" type="text" placeholder="ニックネーム" autocomplete="off" />
-    <input id="login-room" type="text" placeholder="ルーム名" autocomplete="off" />
-    <!-- Dropdown of existing rooms; populated from the server -->
-    <select id="rooms-select">
-      <option value="">既存のルームを選択…</option>
-    </select>
-    <input id="login-pass" type="password" placeholder="パスワード (空白可)" autocomplete="off" />
-    <!-- Remember login checkbox -->
-    <label id="remember-container" style="font-size: 0.85em;"><input type="checkbox" id="remember-login" /> 入力情報を保存</label>
-    <button id="login-btn">入室</button>
-    <button id="delete-room-btn">ルーム削除</button>
+
+  <!-- ログインオーバーレイ -->
+  <div id="login-overlay" class="overlay" style="display:flex;">
+    <div class="panel">
+      <h2>入室</h2>
+      <label>ニックネーム <input id="login-name" /></label>
+      <label>ルーム名 <input id="login-room" /></label>
+      <label>パスワード <input id="login-pass" type="password" /></label>
+      <label class="remember"><input id="remember-login" type="checkbox" /> 入室情報を保存</label>
+      <div class="row">
+        <button id="login-btn">入室</button>
+        <button id="delete-room-btn">ルーム削除</button>
+      </div>
+      <div class="row">
+        <select id="rooms-select">
+          <option value="">既存のルームを選択</option>
+        </select>
+      </div>
+    </div>
   </div>
-  <!-- Logout button appears when logged in -->
-  <button id="logout-btn" style="display: none;">ログアウト</button>
-  <script
-    src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
-    crossorigin=""
-  ></script>
+
+  <!-- クライアントJS -->
   <script src="main.js"></script>
 </body>
 </html>
